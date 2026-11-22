@@ -9,11 +9,16 @@ const electrostaticCases = {
   likePositive: '等量正点电荷',
   likeNegative: '等量负点电荷',
   dipole: '等量异种点电荷',
-  uniform: '匀强电场'
+  uniform: '匀强电场',
+  groundedPlate: '点电荷与金属板的电场'
 };
-const lineModes = ['dipole','likePositive','positive','uniform','likeNegative','negative'];
-const potentialModes = ['positive','uniform','negative','likePositive','likeNegative','dipole'];
+const lineModes = ['dipole','likePositive','positive','uniform','likeNegative','negative','groundedPlate'];
+const potentialModes = ['positive','uniform','negative','likePositive','likeNegative','dipole','groundedPlate'];
 const fieldSelector = modes => select('电场类型',modes.map(mode=>electrostaticCases[mode]));
+const plateControls = modes => [
+  when(0,modes.indexOf('groundedPlate'),select('点电荷电性',['正电荷','负电荷'])),
+  when(0,modes.indexOf('groundedPlate'),slider('点电荷到板的距离',1.2,3.6,2,.2,' cm'))
+];
 
 const chapters = [
   { id: '9', label: '第九章', name: '静电场及其应用', intro: '从电子的转移出发，观察电荷如何相互作用，以及如何用电场描述这种作用。', icon: 'field', topics: [
@@ -54,8 +59,8 @@ const chapters = [
       quiz:blank('多个场源在一点产生的合电场强度等于各场强的','。','矢量和|向量和','相加时需要同时考虑大小和方向。') },
     { id:'lines', title:'电场线与匀强电场', formula:'场线的切线方向 = 电场方向',
       idea:'电场线由正电荷出发或来自无穷远，终止于负电荷或无穷远，彼此不相交。用疏密定性表示场强；匀强电场的场线是平行等距直线。动画中的光点只标示场线方向。',
-      try:'切换电荷组合，跟着箭头看场线从哪里出发、到哪里结束。双电荷图的连线、中垂线和中点 O 对应图下的场强说明。',
-      controls:[fieldSelector(lineModes)],
+      try:'切换电荷组合，观察场线的方向。选择「点电荷与金属板的电场」，试着改变电荷正负和到板的距离，观察板面附近的场线。',
+      controls:[fieldSelector(lineModes),...plateControls(lineModes)],
       quiz:blank('在等量同种点电荷的连线中点，电场强度为','。','0|零','两个场强矢量等大反向。等量异号的情形下，中点场强同向相加。') },
     { id:'shield', title:'静电平衡与静电屏蔽', formula:'E导体内部 = 0　　φ导体 = 常量',
       idea:'静电平衡时金属材料内部场强为零。外屏蔽看外场对空腔的影响，封闭金属壳即可隔绝外场。内屏蔽看腔内电荷对壳外的影响，接地后外表面的感应净电荷消失，腔内电场仍存在。模型中腔内电荷位于球壳中心，演示内屏蔽时没有额外外场。',
@@ -87,8 +92,8 @@ const chapters = [
       quiz:blank('若 φ_A = 8 V、φ_B = 2 V，则 U_AB 等于','V。','6|+6','A 到 B 的电势差等于 8 − 2 = 6 V。') },
     { id:'equipotential', title:'等势面与电场线', formula:'同一等势面上：Δφ = 0',
       idea:'图中显示等势面在二维截面中的等势线。场强非零处，电场线与等势线垂直，从高电势指向低电势。点电荷的等势面为同心球面；等量异号电荷的中垂面电势为零（取无穷远为零）。',
-      try:'切换电场类型，拖动滑杆选中一组等势线。黄色探针沿线移动时，电势读数保持不变。',
-      controls:[fieldSelector(potentialModes),slider('等势线编号',1,5,3)],
+      try:'拖动滑杆选中等势线，观察黄色探针移动时的电势。选择「点电荷与金属板的电场」后，1 号等势线就是接地板面。',
+      controls:[fieldSelector(potentialModes),slider('等势线编号',1,5,3),...plateControls(potentialModes)],
       quiz:blank('沿同一等势面移动电荷，静电力做功为','。','0|零','U = 0，所以不论电荷是什么符号，W = qU = 0。') },
     { id:'projection', title:'匀强电场中的 U = Ed', formula:'U_AB = E·d∥',
       idea:'d∥ 是从 A 到 B 在电场方向上的有符号投影。垂直于场方向的位移不贡献电势差。匀强场中，线段中点电势等于端点电势的平均值。',
