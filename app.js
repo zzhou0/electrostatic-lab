@@ -165,10 +165,13 @@ function attachSimulation(topic){
   const inputs=topic.controls.map((_,i)=>document.querySelector('#control-'+i));
   let phase=0,frame=0,previous=0,running=!lowMotion.matches;
   const single=topic.animated||topic.id==='work'||topic.id==='sharing';
+  const isFriction=()=>topic.id==='charging'&&inputs[0].value==='0';
+  const endsAfterOnePlay=()=>single||isFriction();
   const readouts=topic.controls.map((_,i)=>document.querySelector('#value-'+i));
   const conditionalControls=topic.controls.flatMap((control,i)=>control.visibleWhen
     ? [{label:inputs[i].closest('.control'),...control.visibleWhen}] : []);
   const draw=()=>{
+    if(isFriction())inputs[1].value=Math.round(phase*100);
     const values=inputs.map(input=>Number(input.value));
     for(const {label,index,value} of conditionalControls)label.hidden=values[index]!==value;
     for(const [i,control] of topic.controls.entries()){
@@ -178,8 +181,9 @@ function attachSimulation(topic){
     const text=drawSimulation(canvas,topic.id,values,phase);
     if(readout.textContent!==text)readout.textContent=text;
   };
-  const update=()=>{play.textContent=running?'暂停':single&&phase===1?'重播':'播放';};
+  const update=()=>{play.textContent=running?'暂停':endsAfterOnePlay()&&phase===1?'重播':'播放';};
   function duration(){
+    if(isFriction())return 5600;
     if(topic.id==='rc')return 7000;
     if(topic.id==='accelerate'){
       const [u,d,k]=inputs.map(input=>Number(input.value));
@@ -191,7 +195,7 @@ function attachSimulation(topic){
     if(!running)return;
     if(previous)phase+=Math.min(timestamp-previous,50)/duration();
     previous=timestamp;
-    if(single&&phase>=1){phase=1;running=false;update();}
+    if(endsAfterOnePlay()&&phase>=1){phase=1;running=false;update();}
     else if(phase>=1)phase%=1;
     draw();
     if(running)frame=requestAnimationFrame(animate);
@@ -204,7 +208,11 @@ function attachSimulation(topic){
   inputs.forEach((input,i)=>{
     input.value=topic.controls[i].initial;
     input.addEventListener('input',()=>{
-      if(single){phase=0;restart(!lowMotion.matches);}
+      if(topic.id==='charging'&&i===0){
+        phase=0;inputs[1].value=isFriction()?0:topic.controls[1].initial;restart(!lowMotion.matches);
+      }else if(isFriction()){
+        phase=Number(input.value)/100;restart(false);
+      }else if(single){phase=0;restart(!lowMotion.matches);}
       else draw();
     });
   });

@@ -267,6 +267,45 @@ function heroArt(canvas,variant) {
   particle(c,leftX,centerY,1,cover?33:30);particle(c,rightX,centerY,-1,cover?33:30);
 }
 
+function frictionCharging(c,p){
+  const stationaryX=350, center=166, width=138, height=134;
+  const approachEnd=.17, rubbingEnd=.84;
+  const rubbing=limit((p-approachEnd)/(rubbingEnd-approachEnd),0,1);
+  const gap=120*(1-limit(p/approachEnd,0,1)+limit((p-rubbingEnd)/(1-rubbingEnd),0,1));
+  const ax=stationaryX-width-gap, ay=center+42*Math.sin(2*TAU*rubbing);
+  const inContact=p>=approachEnd&&p<=rubbingEnd;
+  const stage=p<approachEnd?'甲向乙靠近':p<rubbingEnd?'保持接触，上下往复摩擦':p<1?'摩擦结束，甲乙分开':'分开后带等量异种电荷';
+  label(c,stage,320,31,mint,21);
+  for(const [name,x,y,fill,border] of [['甲',ax,ay,'#354239','#a8c690'],['乙',stationaryX,center,'#233c45','#8fbaca']]){
+    rect(c,x,y-height/2,width,height,fill);
+    path(c,[[x,y-height/2],[x+width,y-height/2],[x+width,y+height/2],[x,y+height/2],[x,y-height/2]],border,2);
+    label(c,name,x+width/2,y-46,ink,21);
+  }
+  if(inContact){
+    const top=Math.max(ay,center)-height/2, bottom=Math.min(ay,center)+height/2;
+    path(c,[[stationaryX,top],[stationaryX,bottom]],gold,3);
+    const direction=Math.cos(2*TAU*rubbing)>=0?1:-1;
+    arrow(c,ax-21,ay-direction*21,0,direction*42,gold,3);
+  }
+  for(let i=0;i<2;i++){
+    particle(c,stationaryX+87,center-14+i*32,1,7);
+    particle(c,stationaryX+112,center-14+i*32,-1,7);
+  }
+  let transferred=0;
+  for(let i=0;i<4;i++){
+    const offset=-20+i*20;
+    const transfer=limit((rubbing-.07-i*.23)/.14,0,1);
+    const fromX=ax+width-33, toX=stationaryX+33;
+    const x=fromX+(toX-fromX)*transfer, y=ay+(center-ay)*transfer+offset;
+    particle(c,ax+36,ay+offset,1,8);
+    if(transfer>0&&transfer<1)arrow(c,stationaryX-13,y+9,26,0,mint,1.6);
+    particle(c,x,y,-1,8);
+    if(transfer>=.5)transferred++;
+  }
+  sceneCaption(c,'蓝色：电子', '黄色：摩擦接触面');
+  return '甲 '+signed(transferred)+'e · 乙 '+signed(-transferred)+'e · 总净电荷 0';
+}
+
 const simulations={
   charge(c,[electrons,mass],t){
     ring(c,320,175,104,'#476764');ring(c,320,175,133,'#315351',1);
@@ -280,11 +319,12 @@ const simulations={
     const q=6-electrons;return '质子 6 个 · 电子 '+electrons+' 个 · 净电荷 '+signed(q)+'e · 相对比荷 '+signed(q/mass);
   },
   charging(c,[mode,progress],t){
+    if(mode===0)return frictionCharging(c,t);
     const p=progress/100, approach=Math.sin(Math.PI*p);
-    const x1=155+(mode===2?134*p:(mode===1?93:185)*approach),x2=485-(mode===1?92*approach:0);
+    const x1=155+(mode===2?134*p:93*approach),x2=485-(mode===1?92*approach:0);
     ring(c,x1,170,68,'#728c7b');ring(c,x2,170,77,'#728c7b');
     label(c,mode===2?'带正电的棒':'甲',x1,270);label(c,mode===2?'中性金属球':'乙',x2,270);
-    const n=mode===1?limit(Math.floor(5*p),0,2):Math.round(4*p);
+    const n=limit(Math.floor(5*p),0,2);
     for(let i=0;i<4;i++){
       if(mode===2){
         particle(c,x1+22*(i%2-.5),147+i*15,1,9);
@@ -292,17 +332,16 @@ const simulations={
       }else{
         const y=143+i*18;
         particle(c,x1-27,y,1,8);
-        if(mode===1)particle(c,x2+27,y,1,8);
-        if(mode===0)particle(c,i<n?x2:x1+20,y,-1,8);
-        if(mode===1)particle(c,i<n?x1+20:x2-20,y,-1,8);
+        particle(c,x2+27,y,1,8);
+        particle(c,i<n?x1+20:x2-20,y,-1,8);
       }
     }
     if(p>0&&p<1&&mode!==2) {
-      const from=mode===0?x1+68:x2-77,to=mode===0?x2-77:x1+68;
+      const from=x2-77,to=x1+68;
       arrow(c,from,114,to-from,0,mint);dot(c,from+(to-from)*t,114,5,blue);
     }
     sceneCaption(c,'蓝色圆点表示可移动的电子');
-    return mode===2?'近端聚集电子，远端电子不足 · 导体净电荷仍为 0':mode===0?'甲 '+signed(n)+'e · 乙 '+signed(-n)+'e · 总净电荷 0':'甲 '+signed(4-n)+'e · 乙 '+signed(n)+'e · 总净电荷 +4e';
+    return mode===2?'近端聚集电子，远端电子不足 · 导体净电荷仍为 0':'甲 '+signed(4-n)+'e · 乙 '+signed(n)+'e · 总净电荷 +4e';
   },
   sharing(c,[mode,q1,q2],t){
     if(mode===1){
