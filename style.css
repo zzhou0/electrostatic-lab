@@ -64,13 +64,15 @@ h1{font-size:clamp(2rem,5.2vw,4.4rem);letter-spacing:-.045em;margin-bottom:18px}
 .sim-header button{min-height:44px;padding:6px 11px;color:#e2f0e6;background:#243d38;border:1px solid #46635b;border-radius:9px;font-weight:660}
 .sim-header button:hover{background:#31524a}
 .sim canvas{width:100%;aspect-ratio:1.75;display:block}
-.readout{min-height:58px;padding:14px 16px;margin:0;background:#182d2b;color:#d9fca8;font-size:.9rem;font-variant-numeric:tabular-nums}
+.sim canvas[data-simulation=lines],.sim canvas[data-simulation=equipotential]{aspect-ratio:16/9}
+.readout{min-height:58px;padding:14px 16px;margin:0;background:#182d2b;color:#d9fca8;font-size:.9rem;font-variant-numeric:tabular-nums;white-space:pre-line}
 .side{display:grid;gap:12px}
 .panel,.quiz-card,.quiz-summary{background:#fff;border:1px solid var(--line);border-radius:17px;padding:17px 19px}
 .panel h2{font-size:1.06rem;margin-bottom:8px}
 .panel p{margin:7px 0 0;color:var(--muted)}
 .formula{display:block;background:#eff5e8;color:#294432;padding:9px 11px;border-radius:9px;font-weight:750;overflow-wrap:anywhere}
 .control{display:block;margin-top:9px}
+.control[hidden]{display:none}
 .control span{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-weight:650;font-size:.91rem}
 .control output{font-size:.875rem;color:#375e41;text-align:right}
 .control input,.control select{width:100%;height:44px;margin:0;accent-color:#355c2e}

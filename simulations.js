@@ -53,30 +53,192 @@ function fieldAt(x,y,sources) {
     return [ex+f*dx,ey+f*dy];
   },[0,0]);
 }
-function fieldLines(sources,count=15) {
-  const lines=[];
-  for(const [sx,sy,q] of sources) {
-    if(q<0)continue;
-    for(let i=0;i<count;i++){
-      const a=TAU*i/count; let x=sx+16*Math.cos(a),y=sy+16*Math.sin(a);const p=[];
-      for(let step=0;step<280;step++){
-        p.push([x,y]);const [ex,ey]=fieldAt(x,y,sources),m=Math.hypot(ex,ey);
-        if(!m)break;
-        x+=4*ex/m;y+=4*ey/m;
-        if(x<-6||x>646||y<-6||y>366||sources.some(([u,v,z])=>z<0&&Math.hypot(x-u,y-v)<16))break;
-      }
-      if(p.length>4)lines.push(p);
+const centerX=W/2, centerY=H/2, halfGap=125;
+const leftX=centerX-halfGap, rightX=centerX+halfGap;
+const fieldCases={
+  positive:[[centerX,centerY,1]], negative:[[centerX,centerY,-1]],
+  likePositive:[[leftX,centerY,1],[rightX,centerY,1]],
+  likeNegative:[[leftX,centerY,-1],[rightX,centerY,-1]],
+  dipole:[[leftX,centerY,1],[rightX,centerY,-1]]
+};
+
+function radialLines(x,y,r1,r2,sign,count=8){
+  return Array.from({length:count},(_,i)=>{
+    const angle=i*TAU/count, dx=Math.cos(angle),dy=Math.sin(angle);
+    const xEdge=Math.abs(dx)<1e-12?Infinity:(dx>0?W-x:x)/Math.abs(dx);
+    const yEdge=Math.abs(dy)<1e-12?Infinity:(dy>0?H-y:y)/Math.abs(dy);
+    const edge=Math.min(xEdge,yEdge);
+    const radius=Math.min(edge+1,r2), steps=Math.ceil((radius-r1)/4);
+    const points=Array.from({length:steps+1},(_,j)=>{
+      const r=r1+(radius-r1)*j/steps;
+      return [x+r*dx,y+r*dy];
+    });
+    return sign<0?points.reverse():points;
+  });
+}
+function directionAt(x,y,sources){
+  const [ex,ey]=fieldAt(x,y,sources), size=Math.hypot(ex,ey);
+  return size?[ex/size,ey/size]:[0,0];
+}
+function traceLeftFieldLine(angle,sources,dipole){
+  const step=3;
+  let x=leftX+15*Math.cos(angle),y=centerY+15*Math.sin(angle);
+  const points=[[x,y]];
+  for(let i=0;i<400;i++){
+    if(!dipole&&Math.hypot(x-centerX,y-centerY)<13)break;
+    const [ux,uy]=directionAt(x,y,sources);
+    const [vx,vy]=directionAt(x+ux*step/2,y+uy*step/2,sources);
+    const nextX=x+vx*step,nextY=y+vy*step;
+    if(nextX>=centerX){
+      if(dipole)points.push([centerX,y+(nextY-y)*(centerX-x)/(nextX-x)]);
+      break;
     }
+    x=nextX;y=nextY;points.push([x,y]);
+    if(x<0||y<0||y>H)break;
+  }
+  return points;
+}
+function pairedFieldLines(dipole){
+  const lines=[],sources=fieldCases[dipole?'dipole':'likePositive'];
+  for(let i=0;i<12;i++){
+    const left=traceLeftFieldLine(i*TAU/12,sources,dipole);
+    const right=left.map(([x,y])=>[W-x,y]);
+    if(dipole)right.reverse();
+    if(dipole&&left.at(-1)[0]===centerX)lines.push(left.concat(right.slice(1)));
+    else lines.push(left,right);
   }
   return lines;
 }
+const positivePairLines=pairedFieldLines(false);
+const cachedLines={
+  positive:radialLines(centerX,centerY,15,Infinity,1),
+  negative:radialLines(centerX,centerY,15,Infinity,-1),
+  likePositive:positivePairLines,
+  likeNegative:positivePairLines.map(points=>points.slice().reverse()),
+  dipole:pairedFieldLines(true)
+};
+
 function renderLines(c,lines,t,color='#80b8a0',animated=true){
-  for(const [i,p] of lines.entries()){
-    path(c,p,color,1.4);
-    const k=Math.floor(p.length*.44);
-    arrow(c,...p[k],p[k+3<p.length?k+3:k+1][0]-p[k][0],p[k+3<p.length?k+3:k+1][1]-p[k][1],color,1.6);
-    if(animated){const index=Math.floor(((t+i*.137)%1)*(p.length-1));dot(c,...p[index],2.8,mint);}
+  for(const [i,points] of lines.entries()){
+    path(c,points,color,1.5);
+    const joinsCharges=Math.hypot(points[0][0]-leftX,points[0][1]-centerY)<17
+      && Math.hypot(points.at(-1)[0]-rightX,points.at(-1)[1]-centerY)<17;
+    for(const fraction of joinsCharges?[.36,.64]:[.5]){
+      const k=Math.floor((points.length-1)*fraction);
+      const [x,y]=points[k],[endX,endY]=points[Math.min(k+4,points.length-1)];
+      arrow(c,x,y,endX-x,endY-y,color,1.7);
+    }
+    if(animated){
+      const frame=((t+i*.137)%1)*(points.length-1), k=Math.floor(frame);
+      const [x,y]=points[k],[endX,endY]=points[k+1];
+      dot(c,x+(endX-x)*(frame-k),y+(endY-y)*(frame-k),2.7,mint);
+    }
   }
+}
+function pairGuides(c){
+  path(c,[[33,centerY],[W-33,centerY]],'#809893',1.3,[5,5]);
+  path(c,[[centerX,15],[centerX,H-15]],'#92aab0',1.4,[5,5]);
+}
+function drawFieldSources(c,mode){
+  for(const [x,y,q] of fieldCases[mode])particle(c,x,y,q,20);
+  if(fieldCases[mode].length===2){
+    dot(c,centerX,centerY,4,ink);
+    label(c,'O',centerX+15,centerY+16,ink,17);
+  }
+}
+function pairFieldCaption(mode){
+  if(mode==='dipole')return [
+    '连线 · 两电荷之间，场强由正电荷一侧向 O 逐渐减小，再向负电荷一侧增大。O 处最小且不为零，段内方向由正指向负；连线外侧离电荷越远越弱。',
+    '中垂线 · O 处场强最大，越远越弱；各点电场方向都平行于连线，由正指向负。'
+  ].join('\n');
+  const direction=mode==='likePositive'?'背离 O':'指向 O';
+  const axialDirection=mode==='likePositive'?'段内指向 O':'段内背离 O';
+  return [
+    '连线 · O 处场强为零，两电荷之间从 O 向任一电荷靠近时场强增大，'+axialDirection+'；连线外侧离电荷越远越弱。',
+    '中垂线 · O 处场强为零，从 O 向任一侧先增大后减小；在距 O 为 a/√2 处最大（a 为半个电荷间距），方向'+direction+'。'
+  ].join('\n');
+}
+
+// Potential is scaled consistently with the plotted distances: φ = 1000 Σ(q/r).
+function potentialAt(x,y,sources){
+  return 1000*sources.reduce((sum,[sx,sy,q])=>sum+q/Math.hypot(x-sx,y-sy),0);
+}
+function potentialLoop(x,y,sources,level,rMin,rMax){
+  return Array.from({length:181},(_,i)=>{
+    const angle=i*TAU/180, dx=Math.cos(angle),dy=Math.sin(angle);
+    let lo=rMin,hi=rMax;
+    for(let step=0;step<26;step++){
+      const r=(lo+hi)/2;
+      if(potentialAt(x+r*dx,y+r*dy,sources)>level)lo=r;
+      else hi=r;
+    }
+    return [x+hi*dx,y+hi*dy];
+  });
+}
+const reflectContour=points=>points.map(([x,y])=>[W-x,y]);
+const likeContours=[9.5,11,18,24,30].map(value=>{
+  const common=value<2000/halfGap;
+  const loop=potentialLoop(common?centerX:leftX,centerY,fieldCases.likePositive,value,common?halfGap:1,common?420:halfGap);
+  return { value, paths:common?[loop]:[loop,reflectContour(loop)] };
+});
+const dipoleContours=[-12,-6,0,6,12].map(value=>{
+  if(!value)return {value,paths:[[[centerX,17],[centerX,H-17]]]};
+  const loop=potentialLoop(leftX,centerY,fieldCases.dipole,Math.abs(value),1,halfGap+55);
+  return {value,paths:[value<0?reflectContour(loop):loop]};
+});
+const positiveContours=[7,9,11,13,15].map(value=>{
+  const r=1000/value;
+  const points=Array.from({length:181},(_,i)=>{
+    const angle=i*TAU/180;
+    return [centerX+r*Math.cos(angle),centerY+r*Math.sin(angle)];
+  });
+  return {value,paths:[points]};
+});
+const contours={
+  positive:positiveContours,
+  negative:positiveContours.map(level=>({...level,value:-level.value})),
+  likePositive:likeContours,
+  likeNegative:likeContours.map(level=>({...level,value:-level.value})),
+  dipole:dipoleContours,
+  uniform:[10,8,6,4,2].map((value,i)=>({value,paths:[[[150+i*85,40],[150+i*85,320]]]}))
+};
+
+const shieldCenter=267, shieldInner=96, shieldOuter=116, outsideProbe=487;
+function shieldProbe(c,x,name){
+  dot(c,x,centerY,6.5,gold);label(c,name,x,centerY+25,gold,17);
+}
+function innerShield(c,shell,q,t){
+  const innerLines=radialLines(shieldCenter,centerY,20,shell?shieldInner:Infinity,Math.sign(q));
+  const outerLines=radialLines(shieldCenter,centerY,shieldOuter,Infinity,Math.sign(q));
+  if(shell){
+    ring(c,shieldCenter,centerY,(shieldOuter+shieldInner)/2,'#9cb1a6',shieldOuter-shieldInner);
+    if(q){
+      for(let i=0;i<8;i++){
+        const a=(i+.5)*TAU/8, dx=Math.cos(a),dy=Math.sin(a);
+        label(c,q>0?'−':'+',shieldCenter+(shieldInner+1)*dx,centerY+(shieldInner+1)*dy,q>0?blue:pink,18);
+        if(shell===1)label(c,q>0?'+':'−',shieldCenter+(shieldOuter+9)*dx,centerY+(shieldOuter+9)*dy,q>0?pink:blue,18);
+      }
+    }
+  }
+  if(q){
+    const color=['#537e70','#689a81','#88b796','#a7c8a1'][Math.abs(q)-1];
+    renderLines(c,innerLines,t,color);
+    if(shell===1)renderLines(c,outerLines,t,color);
+  }
+  if(shell===2){
+    const wire=263;
+    path(c,[[wire,centerY+shieldOuter],[wire,315]],mutedInk,2.5);
+    for(let i=0;i<3;i++)path(c,[[wire-15+i*5,315+i*6],[wire+15-i*5,315+i*6]],mutedInk,2.5);
+    label(c,'接地',wire+45,315,ink,18);
+  }
+  particle(c,shieldCenter,centerY,q,19);
+  label(c,'腔内点电荷',shieldCenter,centerY-37,ink,17);
+  shieldProbe(c,outsideProbe,'壳外探针');
+  if(!shell)return '移除金属壳 · 壳外探针场强 '+Math.abs(q)+'（相对值）';
+  const outside=shell===2?0:Math.abs(q);
+  return '壳外探针场强 '+outside+'（相对值） · 金属材料内部场强 0\n'
+    +'内壁电荷 '+signed(-q)+' · 外表面电荷 '+signed(shell===2?0:q)+'。'
+    +(q?'腔内仍有电场。':'腔内无电荷，场强为零。');
 }
 function uniform(c, x1=72,x2=570, y1=70,y2=295,color='#4d7c6e') {
   for(let y=y1;y<=y2;y+=45)arrow(c,x1,y,x2-x1,0,color,1.6);
@@ -95,21 +257,15 @@ function heroArt(canvas,variant) {
     for(let i=135;i<535;i+=51){arrow(c,i,128,0,105,'#64886b',2.5);label(c,'+',i,72,'#486e4f',25);label(c,'−',i,291,'#486e4f',25);}
     return;
   }
-  const sources=[[194,181,1],[456,181,-1]];
   const cover=variant==='hero';
   if(cover){
     grid(c);
     const g=c.createRadialGradient(330,181,20,330,181,355);
     g.addColorStop(0,'#284e35');g.addColorStop(1,'#12222300');rect(c,0,0,W,H,g);
   }
-  renderLines(c,fieldLines(sources,17),.23,cover?'#8ab67d':'#72977c',cover);
-  particle(c,194,181,1,cover?33:30);particle(c,456,181,-1,cover?33:30);
+  renderLines(c,cachedLines.dipole,.23,cover?'#8ab67d':'#72977c',cover);
+  particle(c,leftX,centerY,1,cover?33:30);particle(c,rightX,centerY,-1,cover?33:30);
 }
-
-const fieldCases=[
-  [[195,180,1],[445,180,-1]],[[195,180,1],[445,180,1]],[[320,180,1]]
-];
-const cachedLines=fieldCases.map(s=>fieldLines(s));
 
 const simulations={
   charge(c,[electrons,mass],t){
@@ -211,17 +367,20 @@ const simulations={
     return '合场横向分量 '+signed(ex*10000)+' · 纵向分量 '+signed(-ey*10000)+'（相对值，向右、向上为正）';
   },
   lines(c,[mode],t){
-    if(mode===3){
+    const type=lineModes[mode];
+    if(type==='uniform'){
       uniform(c);
       for(let y=70;y<=295;y+=45)dot(c,80+480*t,y,3,mint);
-    }else{
-      renderLines(c,cachedLines[mode],t);
-      for(const [x,y,q] of fieldCases[mode])particle(c,x,y,q);
-      if(mode<2){dot(c,320,180,6,gold);label(c,'O',320,206,gold);}
+      return '匀强电场各点场强大小相等、方向相同。';
     }
-    return ['中点 O 的电场向右，场强不为零。','中点 O 的场强为零。','正电荷的电场沿径向向外，离源越远越弱。','匀强电场各点大小和方向都相同。'][mode];
+    const pair=fieldCases[type].length===2;
+    if(pair)pairGuides(c);
+    renderLines(c,cachedLines[type],t);
+    drawFieldSources(c,type);
+    return pair?pairFieldCaption(type):'电场沿径向'+(type==='positive'?'向外':'指向负电荷')+'，离点电荷越远越弱。';
   },
-  shield(c,[mode,e],t){
+  shield(c,[kind,mode,e,grounding,q],t){
+    if(kind===1)return innerShield(c,grounding,q,t);
     const color=['#4a7464','#5c8c70','#80ae7e','#aacc87','#d0eb8e'][e-1];
     if(!mode){
       for(let x=50;x<=590;x+=45)for(let y=45;y<=315;y+=45){
@@ -237,8 +396,8 @@ const simulations={
         label(c,'+',320+112*Math.cos(i*.28),180+112*Math.sin(i*.28),pink,21);
       }
     }else{uniform(c,62,576,70,295,color);dot(c,85+470*t,160,4,mint);}
-    dot(c,320,180,7,gold);label(c,'腔内探针',320,214);
-    return '外电场 '+e+' · 探针场强 '+(mode?e:0)+'（相对值，示意图）';
+    shieldProbe(c,320,'腔内探针');
+    return '外电场 '+e+' · 腔内探针场强 '+(mode?e:0)+'（相对值）';
   },
   tip(c,[mode,sharp,volts],t){
     if(mode){
@@ -286,18 +445,25 @@ const simulations={
     return 'φ_A = '+a+' V · φ_B = '+b+' V · U_AB = 6 V · EₚA = '+signed(a*q)+' μJ';
   },
   equipotential(c,[mode,n],t){
-    const a=t*TAU,radii=[44,55,73,97,140],values=[10,8,6,4.5,3.1];
-    if(mode){
+    const type=potentialModes[mode], levels=contours[type], selected=levels[n-1];
+    const pair=fieldCases[type]?.length===2;
+    if(pair)pairGuides(c);
+    if(type==='uniform'){
       uniform(c,53,585,68,293);
-      for(let i=1;i<=5;i++){const x=65+i*85;path(c,[[x,42],[x,317]],i===n?gold:'#79a4cc',i===n?3:1.5,[6,5]);}
-      dot(c,65+n*85,76+194*(.5-.5*Math.cos(a)),8,gold);
-    }else{
-      particle(c,320,180,1,21);
-      for(let i=0;i<8;i++){const d=i*TAU/8;arrow(c,320+32*Math.cos(d),180+32*Math.sin(d),120*Math.cos(d),120*Math.sin(d),'#517d68');}
-      for(const [i,r] of radii.entries())ring(c,320,180,r,i===n-1?gold:'#79a4cc',i===n-1?3:1.5);
-      dot(c,320+radii[n-1]*Math.cos(a),180+radii[n-1]*Math.sin(a),8,gold);
+    }else renderLines(c,cachedLines[type],t,'#638f7d',false);
+    for(const level of levels){
+      if(level!==selected)for(const points of level.paths)path(c,points,'#84a7d2',1.7,[5,4]);
     }
-    return '探针所在等势线 '+n+' · φ ≈ '+(mode?12-2*n:values[n-1])+' V · 沿线移动 W = 0';
+    for(const points of selected.paths)path(c,points,gold,2.9);
+    if(type!=='uniform')drawFieldSources(c,type);
+    const probe=selected.paths[0];
+    if(probe.length===2){
+      const y=probe[0][1]+(probe[1][1]-probe[0][1])*(.5-.5*Math.cos(t*TAU));
+      dot(c,probe[0][0],y,7,gold);
+    }else dot(c,...probe[Math.floor(t*(probe.length-1))],7,gold);
+    const caption='黄：选中等势线　蓝：其他等势线　绿：电场线\n'
+      +'探针所在等势线 '+n+' · φ = '+fmt(selected.value)+' V · 沿线移动 W = 0';
+    return pair?caption+'\n'+pairFieldCaption(type):caption;
   },
   projection(c,[angle,e],t){
     const a=angle*Math.PI/180, ax=320,ay=235,bx=ax+156*Math.cos(a),by=ay-156*Math.sin(a),d=2*Math.cos(a);

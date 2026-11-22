@@ -1,6 +1,19 @@
 const slider = (label, min, max, initial, step = 1, unit = '') => ({ label, min, max, initial, step, unit });
 const select = (label, options, initial = 0) => ({ label, options, initial });
+const when = (index, value, control) => ({ ...control, visibleWhen: { index, value } });
 const blank = (before, after, answers, explanation) => ({ before, after, answers: answers.split('|'), explanation });
+
+const electrostaticCases = {
+  positive: '单个正点电荷',
+  negative: '单个负点电荷',
+  likePositive: '等量正点电荷',
+  likeNegative: '等量负点电荷',
+  dipole: '等量异种点电荷',
+  uniform: '匀强电场'
+};
+const lineModes = ['dipole','likePositive','positive','uniform','likeNegative','negative'];
+const potentialModes = ['positive','uniform','negative','likePositive','likeNegative','dipole'];
+const fieldSelector = modes => select('电场类型',modes.map(mode=>electrostaticCases[mode]));
 
 const chapters = [
   { id: '9', number: '09', name: '静电场及其应用', intro: '从电子的转移出发，观察电荷如何相互作用，以及如何用电场描述这种作用。', icon: 'field', topics: [
@@ -39,15 +52,21 @@ const chapters = [
       try:'将探针移到两等量正电荷的中垂线上，观察水平方向的分量，再改成异号。',
       controls:[slider('观测点横向位置',-100,100,0),slider('观测点高度',18,110,68),select('场源组合',['等量同号','等量异号','正电细杆（微元）'])],
       quiz:blank('多个场源在一点产生的合电场强度等于各场强的','。','矢量和|向量和','相加时需要同时考虑大小和方向。') },
-    { id:'lines', title:'电场线与匀强电场', formula:'场线的切线方向 = E⃗ 的方向',
+    { id:'lines', title:'电场线与匀强电场', formula:'场线的切线方向 = 电场方向',
       idea:'电场线由正电荷出发或来自无穷远，终止于负电荷或无穷远，彼此不相交。用疏密定性表示场强；匀强电场的场线是平行等距直线。动画中的光点只标示场线方向。',
-      try:'比较等量同号和异号时中点的场强；接着切换到匀强电场。',
-      controls:[select('电场类型',['等量异号','等量正电荷','单个正电荷','匀强电场'])],
+      try:'切换电荷组合，跟着箭头看场线从哪里出发、到哪里结束。双电荷图的连线、中垂线和中点 O 对应图下的场强说明。',
+      controls:[fieldSelector(lineModes)],
       quiz:blank('在等量同种点电荷的连线中点，电场强度为','。','0|零','两个场强矢量等大反向。等量异号的情形下，中点场强同向相加。') },
     { id:'shield', title:'静电平衡与静电屏蔽', formula:'E导体内部 = 0　　φ导体 = 常量',
-      idea:'导体达到静电平衡时内部场强为零，表面电场垂直于表面。封闭导体壳即使不接地，也能屏蔽外部静电场对无电荷空腔的影响。',
-      try:'打开和关闭金属壳，对比腔内探针处是否仍有来自外部的电场。',
-      controls:[select('金属壳状态',['闭合金属壳','移除金属壳']),slider('外电场强度',1,5,3,1,'（相对值）')],
+      idea:'静电平衡时金属材料内部场强为零。外屏蔽看外场对空腔的影响，封闭金属壳即可隔绝外场。内屏蔽看腔内电荷对壳外的影响，接地后外表面的感应净电荷消失，腔内电场仍存在。模型中腔内电荷位于球壳中心，演示内屏蔽时没有额外外场。',
+      try:'先比较外屏蔽中装壳前后的腔内场强。再选「内屏蔽」，切换金属壳的接地状态，观察壳外探针和内、外表面的电荷。',
+      controls:[
+        select('屏蔽方式',['外屏蔽 · 外场影响空腔','内屏蔽 · 腔内电荷影响壳外']),
+        when(0,0,select('金属壳状态',['闭合金属壳','移除金属壳'])),
+        when(0,0,slider('外电场强度',1,5,3,1,'（相对值）')),
+        when(0,1,select('金属壳与接地',['移除金属壳','闭合 · 未接地','闭合 · 已接地'],1)),
+        when(0,1,slider('腔内电荷 q',-4,4,3,1,'（相对值）'))
+      ],
       quiz:blank('静电平衡时，封闭金属壳的无电荷空腔内，外电场造成的场强为','。','0|零','金属壳上的感应电荷抵消了空腔内的外场。') },
     { id:'tip', title:'尖端放电与静电吸附', formula:'尖端附近的电场更强',
       idea:'尖锐部分表面电荷通常更密集，附近场强更大，足够强时可使空气电离。静电吸附可用电场吸引带电粒子，例如静电除尘。',
@@ -67,9 +86,9 @@ const chapters = [
       controls:[slider('零点改变引起的整体平移',-6,6,0,1,' V'),select('试探电荷',['+1 μC','−1 μC'])],
       quiz:blank('若 φ_A = 8 V、φ_B = 2 V，则 U_AB 等于','V。','6|+6','A 到 B 的电势差等于 8 − 2 = 6 V。') },
     { id:'equipotential', title:'等势面与电场线', formula:'同一等势面上：Δφ = 0',
-      idea:'点电荷的等势面为同心球面；匀强电场中是平行平面。电场线与等势面垂直，从高电势指向低电势。等差等势面越密，局部场强越大。',
-      try:'在两种电场间切换，跟着黄色探针沿同一等势线走，观察电势读数。',
-      controls:[select('电场类型',['正点电荷','匀强电场']),slider('等势线编号',1,5,3)],
+      idea:'图中显示等势面在二维截面中的等势线。场强非零处，电场线与等势线垂直，从高电势指向低电势。点电荷的等势面为同心球面；等量异号电荷的中垂面电势为零（取无穷远为零）。',
+      try:'切换电场类型，拖动滑杆选中一组等势线。黄色探针沿线移动时，电势读数保持不变。',
+      controls:[fieldSelector(potentialModes),slider('等势线编号',1,5,3)],
       quiz:blank('沿同一等势面移动电荷，静电力做功为','。','0|零','U = 0，所以不论电荷是什么符号，W = qU = 0。') },
     { id:'projection', title:'匀强电场中的 U = Ed', formula:'U_AB = E·d∥',
       idea:'d∥ 是从 A 到 B 在电场方向上的有符号投影。垂直于场方向的位移不贡献电势差。匀强场中，线段中点电势等于端点电势的平均值。',

@@ -136,7 +136,7 @@ function lesson(chapter,topic){
     <div class="lesson">
       <figure class="sim">
         <div class="sim-header"><strong>互动演示</strong><div><button id="play" type="button"></button><button id="reset" type="button">重置</button></div></div>
-        <canvas id="canvas" role="img" aria-label="${topic.title}的动画示意">${topic.idea}</canvas>
+        <canvas id="canvas" data-simulation="${topic.id}" role="img" aria-label="${topic.title}的动画示意">${topic.idea}</canvas>
         <figcaption class="readout" id="readout"></figcaption>
       </figure>
       <div class="side">
@@ -166,8 +166,11 @@ function attachSimulation(topic){
   let phase=0,frame=0,previous=0,running=!lowMotion.matches;
   const single=topic.animated||topic.id==='work'||topic.id==='sharing';
   const readouts=topic.controls.map((_,i)=>document.querySelector('#value-'+i));
+  const conditionalControls=topic.controls.flatMap((control,i)=>control.visibleWhen
+    ? [{label:inputs[i].closest('.control'),...control.visibleWhen}] : []);
   const draw=()=>{
     const values=inputs.map(input=>Number(input.value));
+    for(const {label,index,value} of conditionalControls)label.hidden=values[index]!==value;
     for(const [i,control] of topic.controls.entries()){
       const output=readouts[i];
       if(output)output.value=values[i]+control.unit;
