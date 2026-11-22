@@ -11,8 +11,10 @@ function storeAnswers(answers){
   try { localStorage.setItem(key,JSON.stringify(answers)); }
   catch { /* The current form still works when storage is unavailable. */ }
 }
-const chapterName = chapter => chapter.id==='9'?'第九章':'第十章';
+const chapterName = chapter => chapter.label;
 const chapterLink = chapter => '#/'+chapter.id;
+document.querySelector('.bar nav').innerHTML=chapters.map(chapter=>
+  '<a href="'+chapterLink(chapter)+'">'+chapterName(chapter)+'</a>').join('');
 const topicLink = (chapter,topic) => chapterLink(chapter)+'/'+topic.id;
 const quizLink = chapter => chapterLink(chapter)+'/quiz';
 const breadcrumb = (chapter,current) => '<div class="crumb"><a href="#/">全部章节</a><span aria-hidden="true">/</span>'+ (current?'<a href="'+chapterLink(chapter)+'">'+chapterName(chapter)+'</a><span aria-hidden="true">/</span><span>'+current+'</span>':'<span>'+chapterName(chapter)+'</span>')+'</div>';
@@ -24,7 +26,7 @@ function home(){
       <div class="hero-copy">
         <p class="eyebrow">高中物理 · 必修第三册</p>
         <h1 id="welcome">让看不见的<span>电场动起来</span></h1>
-        <p>拖动滑杆、改变电荷，观察电场怎样影响力与能量。看完动画，再用填空检验自己。</p>
+        <p>拖动滑杆观察电场，切换接法探索电路，再用填空检验自己。</p>
         <a class="button primary" href="#/9">从第九章开始</a>
       </div>
       <div class="hero-art"><canvas data-art="hero" aria-hidden="true"></canvas></div>
@@ -60,10 +62,15 @@ function chapterHome(chapter,quiz=false){
     </nav>
     <section id="chapter-content"></section>`;
   if(quiz){fillQuiz(chapter);return;}
-  document.querySelector('#chapter-content').innerHTML=`
-    <div class="section-title"><h2>选择知识点</h2><span>${chapter.topics.length} 个实验</span></div>
-    <div class="topic-grid">${chapter.topics.map(topic=>`
+  const topicCards=topics=>`<div class="topic-grid">${topics.map(topic=>`
       <a class="topic-card" href="${topicLink(chapter,topic)}"><strong>${topic.title}</strong><span>打开互动实验</span></a>`).join('')}</div>`;
+  document.querySelector('#chapter-content').innerHTML=chapter.sections
+    ? chapter.sections.map((name,i)=>`
+      <section class="lesson-group"><h2>${chapter.id}.${i+1} ${name}</h2>
+        ${topicCards(chapter.topics.filter(topic=>topic.section===i+1))}
+      </section>`).join('')
+    : `<div class="section-title"><h2>选择知识点</h2><span>${chapter.topics.length} 个实验</span></div>
+      ${topicCards(chapter.topics)}`;
 }
 
 const normalize = s => s.normalize('NFKC').trim().toLocaleLowerCase().replace(/[\s。．，−–]/g,x=>x==='−'||x==='–'?'-':'');
@@ -184,6 +191,7 @@ function attachSimulation(topic){
   const update=()=>{play.textContent=running?'暂停':endsAfterOnePlay()&&phase===1?'重播':'播放';};
   function duration(){
     if(isFriction())return 8200;
+    if(topic.id==='carrier-flow')return 1320/Number(inputs[2].value);
     if(topic.id==='rc')return 7000;
     if(topic.id==='accelerate'){
       const [u,d,k]=inputs.map(input=>Number(input.value));
@@ -208,6 +216,10 @@ function attachSimulation(topic){
   inputs.forEach((input,i)=>{
     input.value=topic.controls[i].initial;
     input.addEventListener('input',()=>{
+      if(topic.id==='multimeter'){
+        if(i===0||i===2)inputs[3].value='0';
+        if(i===3&&inputs[1].value!=='2')input.value='0';
+      }
       if(topic.id==='charging'&&i===0){
         phase=0;inputs[1].value=isFriction()?0:topic.controls[1].initial;restart(!lowMotion.matches);
       }else if(isFriction()){

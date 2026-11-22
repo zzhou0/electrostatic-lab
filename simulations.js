@@ -250,6 +250,10 @@ function sceneCaption(c,left,right){
 
 function heroArt(canvas,variant) {
   const c=surface(canvas);
+  if(variant==='circuit'){
+    chapterCircuitArt(c);
+    return;
+  }
   if(variant==='energy'){
     rect(c,110,99,420,164,'#dce8d4');
     path(c,[[105,99],[535,99]],'#567e59',8);
@@ -608,5 +612,5 @@ const simulations={
 
 function drawSimulation(canvas,id,values,t) {
   const c=surface(canvas);grid(c);
-  return simulations[id](c,values,t);
+  return (simulations[id]??circuitSimulations[id])(c,values,t);
 }
