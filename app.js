@@ -183,7 +183,7 @@ function attachSimulation(topic){
   };
   const update=()=>{play.textContent=running?'暂停':endsAfterOnePlay()&&phase===1?'重播':'播放';};
   function duration(){
-    if(isFriction())return 5600;
+    if(isFriction())return 8200;
     if(topic.id==='rc')return 7000;
     if(topic.id==='accelerate'){
       const [u,d,k]=inputs.map(input=>Number(input.value));

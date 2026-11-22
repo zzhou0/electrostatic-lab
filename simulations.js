@@ -269,12 +269,16 @@ function heroArt(canvas,variant) {
 
 function frictionCharging(c,p){
   const stationaryX=350, center=166, width=138, height=134;
-  const approachEnd=.17, rubbingEnd=.84;
-  const rubbing=limit((p-approachEnd)/(rubbingEnd-approachEnd),0,1);
-  const gap=120*(1-limit(p/approachEnd,0,1)+limit((p-rubbingEnd)/(1-rubbingEnd),0,1));
+  const contactAt=.20, rubbingStart=.30, rubbingEnd=.86;
+  const rubbing=limit((p-rubbingStart)/(rubbingEnd-rubbingStart),0,1);
+  const gap=120*(1-limit(p/contactAt,0,1)+limit((p-rubbingEnd)/(1-rubbingEnd),0,1));
   const ax=stationaryX-width-gap, ay=center+42*Math.sin(2*TAU*rubbing);
-  const inContact=p>=approachEnd&&p<=rubbingEnd;
-  const stage=p<approachEnd?'甲向乙靠近':p<rubbingEnd?'保持接触，上下往复摩擦':p<1?'摩擦结束，甲乙分开':'分开后带等量异种电荷';
+  const inContact=p>=contactAt&&p<=rubbingEnd;
+  const isRubbing=p>=rubbingStart&&p<rubbingEnd;
+  const stage=p<contactAt?'靠近 · 电子未转移'
+    :p<rubbingStart?'已贴合 · 电子未转移'
+    :isRubbing?'保持贴合 · 上下往复摩擦'
+    :p<1?'摩擦结束 · 甲乙分开':'分开后 · 两物体带等量异种电荷';
   label(c,stage,320,31,mint,21);
   for(const [name,x,y,fill,border] of [['甲',ax,ay,'#354239','#a8c690'],['乙',stationaryX,center,'#233c45','#8fbaca']]){
     rect(c,x,y-height/2,width,height,fill);
@@ -284,6 +288,8 @@ function frictionCharging(c,p){
   if(inContact){
     const top=Math.max(ay,center)-height/2, bottom=Math.min(ay,center)+height/2;
     path(c,[[stationaryX,top],[stationaryX,bottom]],gold,3);
+  }
+  if(isRubbing){
     const direction=Math.cos(2*TAU*rubbing)>=0?1:-1;
     arrow(c,ax-21,ay-direction*21,0,direction*42,gold,3);
   }
@@ -303,7 +309,7 @@ function frictionCharging(c,p){
     if(transfer>=.5)transferred++;
   }
   sceneCaption(c,'蓝色：电子', '黄色：摩擦接触面');
-  return '甲 '+signed(transferred)+'e · 乙 '+signed(-transferred)+'e · 总净电荷 0';
+  return stage+'\n甲 '+signed(transferred)+'e · 乙 '+signed(-transferred)+'e · 总净电荷 0';
 }
 
 const simulations={
